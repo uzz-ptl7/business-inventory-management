@@ -1,73 +1,103 @@
-# Welcome to your Lovable project
+# 🏪 Shop Management System
 
-## Project info
+A **web-based, multi-user shop management system** that helps businesses manage products, stock, customers, sales, and invoices.  
+Each user (shop owner) has their **own separate dashboard, inventory, and sales records**, ensuring full data isolation.
 
-**URL**: https://lovable.dev/projects/6ca036cb-6b0f-49b1-91f4-2ac6a39c2388
+---
 
-## How can I edit this code?
+## 🚀 Features
 
-There are several ways of editing your application.
+### 🔑 Authentication & User Accounts
 
-**Use Lovable**
+- Secure **login/signup** system
+- Each signup creates a new **business workspace**
+- Business name displayed across the app
+- Profile management (update name, email, phone, password)
+- Password reset functionality
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/6ca036cb-6b0f-49b1-91f4-2ac6a39c2388) and start prompting.
+### 📊 Dashboard (Per Business/User)
 
-Changes made via Lovable will be committed automatically to this repo.
+- Shows **key values**:
+  - Total sales (daily, weekly, monthly, lifetime)
+  - Total customers
+  - Total products in stock
+  - Low-stock products
+  - Revenue & profit summary
+- **Charts**:
+  - Sales trends over time
+  - Top-selling products
+  - Customer purchase trends
 
-**Use your preferred IDE**
+### 📦 Product & Inventory Management
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Add, edit, delete products
+- Track stock quantity, cost price, selling price
+- SKU/Barcode support
+- Restock products & track stock history
+- Low-stock alerts
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 👥 Customer Management
 
-Follow these steps:
+- Add, edit, delete customer details
+- View customer purchase history
+- Customer contact details (phone, email, address)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 💰 Sales & Invoicing
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- Create invoices with:
+  - Customer selection
+  - Product selection (with auto subtotal, tax, discounts, total)
+  - Payment method (cash, card, mobile money, etc.)
+- Generate **printable/PDF invoices**
+- Edit, update, delete sales records
+- Search & filter sales history
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 📑 Reports & Analytics
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+- Sales reports (daily, weekly, monthly, yearly)
+- Profit/loss summaries
+- Export reports to **Excel/PDF**
 
-**Edit a file directly in GitHub**
+### 🎨 UI/UX
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Fully **responsive design** (desktop, tablet, mobile)
+- **Hamburger menu** for easy navigation on all screen sizes
+- Clean and user-friendly interface
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🛠️ Tech Stack (Recommended)
 
-## What technologies are used for this project?
+- **Frontend:** React (with responsive UI, TailwindCSS)
+- **Backend:** Node.js
+- **Database:** PostgreSQL(Supabase)
+- **Authentication:** Supabase session-based auth
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📂 Database Schema (High-Level)
 
-## How can I deploy this project?
+**Tables:**
 
-Simply open [Lovable](https://lovable.dev/projects/6ca036cb-6b0f-49b1-91f4-2ac6a39c2388) and click on Share -> Publish.
+- `users` → manages login, profile, business info
+- `products` → products per business/user
+- `customers` → customers per business/user
+- `sales` → invoice header (customer, date, totals)
+- `sale_items` → invoice line items (product, qty, price)
+- `stock_history` → logs of restocks/adjustments
 
-## Can I connect a custom domain to my Lovable project?
+**Relationships:**
 
-Yes, you can!
+- One `user` → many `products`, `customers`, `sales`
+- One `sale` → many `sale_items`
+- One `product` → many `sale_items`, many `stock_history`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🔒 Security
+
+- Passwords stored securely (hashed, salted)
+- Role-based access (Owner, Staff — optional)
+- Each user can only see their own data
+
+---
