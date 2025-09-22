@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { 
-  Store, 
   LayoutDashboard, 
   Package, 
   Users, 
@@ -23,6 +22,7 @@ import {
   LogOut,
   Menu
 } from 'lucide-react';
+import sitecraftersLogo from '@/assets/sitecrafters-logo-icon.png';
 
 const Layout = () => {
   const { signOut } = useAuth();
@@ -48,8 +48,8 @@ const Layout = () => {
         <Sidebar>
           <SidebarHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center gap-2">
-              <Store className="h-6 w-6 text-primary" />
-              <span className="font-semibold text-sidebar-foreground">Shop Manager</span>
+              <img src={sitecraftersLogo} alt="Sitecrafters" className="h-6 w-6" />
+              <span className="font-semibold text-sidebar-foreground">Business Manager</span>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -82,7 +82,7 @@ const Layout = () => {
             <SidebarTrigger>
               <Menu className="h-5 w-5" />
             </SidebarTrigger>
-            <h1 className="font-semibold text-foreground">Shop Management System</h1>
+            <h1 className="font-semibold text-foreground">Business Management System</h1>
           </header>
           <main className="flex-1 overflow-auto p-6">
             <Outlet />

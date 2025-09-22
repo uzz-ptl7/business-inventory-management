@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Store, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import sitecraftersLogo from '@/assets/sitecrafters-logo-icon.png';
 
 const Auth = () => {
   const { user, signIn, signUp, loading } = useAuth();
@@ -95,9 +96,9 @@ const Auth = () => {
         <Card>
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <Store className="h-12 w-12 text-primary" />
+              <img src={sitecraftersLogo} alt="Sitecrafters" className="h-12 w-12" />
             </div>
-            <CardTitle className="text-2xl">Shop Management</CardTitle>
+            <CardTitle className="text-2xl">Business Management</CardTitle>
             <CardDescription>
               Manage your business with ease
             </CardDescription>
