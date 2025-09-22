@@ -54,7 +54,7 @@ const Sales = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('walk-in');
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
@@ -168,7 +168,7 @@ const Sales = () => {
         .from('sales')
         .insert([{
           user_id: user!.id,
-          customer_id: selectedCustomer || null,
+          customer_id: selectedCustomer === 'walk-in' ? null : selectedCustomer || null,
           invoice_number: invoiceNumber,
           subtotal,
           tax_amount: taxAmount,
@@ -223,7 +223,7 @@ const Sales = () => {
 
   const resetForm = () => {
     setSaleItems([{ product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
-    setSelectedCustomer('');
+    setSelectedCustomer('walk-in');
     setPaymentMethod('cash');
     setTaxRate(0);
     setDiscountAmount(0);
@@ -264,7 +264,7 @@ const Sales = () => {
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Walk-in Customer</SelectItem>
+                    <SelectItem value="walk-in">Walk-in Customer</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
