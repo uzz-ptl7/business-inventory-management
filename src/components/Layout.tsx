@@ -30,11 +30,11 @@ const Layout = () => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: Package, label: 'Products', path: '/products' },
-    { icon: Users, label: 'Customers', path: '/customers' },
-    { icon: ShoppingCart, label: 'Sales', path: '/sales' },
-    { icon: BarChart3, label: 'Reports', path: '/reports' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: Package, label: 'Products', path: '/dashboard/products' },
+    { icon: Users, label: 'Customers', path: '/dashboard/customers' },
+    { icon: ShoppingCart, label: 'Sales', path: '/dashboard/sales' },
+    { icon: BarChart3, label: 'Reports', path: '/dashboard/reports' },
+    { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
   ];
 
   const handleSignOut = async () => {
