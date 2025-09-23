@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Receipt, Trash2 } from 'lucide-react';
+import { Plus, Receipt, Trash2, Edit, Download, Eye } from 'lucide-react';
 
 interface Sale {
   id: string;
@@ -36,6 +38,8 @@ interface Product {
   name: string;
   price: number;
   stock_quantity: number;
+  is_service: boolean;
+  product_type: string;
 }
 
 interface SaleItem {
@@ -53,7 +57,11 @@ const Sales = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [viewDetailsSale, setViewDetailsSale] = useState<Sale | null>(null);
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [newSaleItems, setNewSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('walk-in');
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -89,12 +97,11 @@ const Sales = () => {
       if (customersError) throw customersError;
       setCustomers(customersData || []);
 
-      // Fetch products
+      // Fetch products (including services which have unlimited stock)
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, price, stock_quantity')
-        .eq('user_id', user!.id)
-        .gt('stock_quantity', 0);
+        .select('id, name, price, stock_quantity, is_service, product_type')
+        .eq('user_id', user!.id);
 
       if (productsError) throw productsError;
       setProducts(productsData || []);
@@ -116,17 +123,17 @@ const Sales = () => {
   };
 
   const addSaleItem = () => {
-    setSaleItems([...saleItems, { product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
+    setNewSaleItems([...newSaleItems, { product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
   };
 
   const removeSaleItem = (index: number) => {
-    if (saleItems.length > 1) {
-      setSaleItems(saleItems.filter((_, i) => i !== index));
+    if (newSaleItems.length > 1) {
+      setNewSaleItems(newSaleItems.filter((_, i) => i !== index));
     }
   };
 
   const updateSaleItem = (index: number, field: string, value: any) => {
-    const updatedItems = [...saleItems];
+    const updatedItems = [...newSaleItems];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     
     if (field === 'product_id') {
@@ -139,18 +146,18 @@ const Sales = () => {
       updatedItems[index].total_price = updatedItems[index].quantity * updatedItems[index].unit_price;
     }
     
-    setSaleItems(updatedItems);
+    setNewSaleItems(updatedItems);
   };
 
   const calculateTotals = () => {
-    const subtotal = saleItems.reduce((sum, item) => sum + item.total_price, 0);
+    const subtotal = newSaleItems.reduce((sum, item) => sum + item.total_price, 0);
     const taxAmount = subtotal * (taxRate / 100);
     const total = subtotal + taxAmount - discountAmount;
     return { subtotal, taxAmount, total };
   };
 
   const handleCreateSale = async () => {
-    if (saleItems.some(item => !item.product_id || item.quantity <= 0)) {
+    if (newSaleItems.some(item => !item.product_id || item.quantity <= 0)) {
       toast({
         title: "Invalid sale items",
         description: "Please fill all product details and quantities",
@@ -183,7 +190,7 @@ const Sales = () => {
       if (saleError) throw saleError;
 
       // Create sale items
-      const saleItemsData = saleItems.map(item => ({
+      const saleItemsData = newSaleItems.map(item => ({
         sale_id: saleData.id,
         product_id: item.product_id,
         quantity: item.quantity,
@@ -197,14 +204,29 @@ const Sales = () => {
 
       if (itemsError) throw itemsError;
 
-      // Update product stock
-      for (const item of saleItems) {
+      // Update product stock (only for physical products, not services)
+      for (const item of newSaleItems) {
         const product = products.find(p => p.id === item.product_id);
-        if (product) {
+        if (product && !product.is_service) {
+          const newQuantity = product.stock_quantity - item.quantity;
           await supabase
             .from('products')
-            .update({ stock_quantity: product.stock_quantity - item.quantity })
+            .update({ stock_quantity: newQuantity })
             .eq('id', item.product_id);
+
+          // Create stock transaction record
+          await supabase
+            .from('stock_transactions')
+            .insert({
+              user_id: user!.id,
+              product_id: item.product_id,
+              transaction_type: 'sale',
+              quantity_change: -item.quantity,
+              quantity_before: product.stock_quantity,
+              quantity_after: newQuantity,
+              reference_id: saleData.id,
+              notes: `Sale: ${saleData.invoice_number}`
+            });
         }
       }
 
@@ -222,11 +244,87 @@ const Sales = () => {
   };
 
   const resetForm = () => {
-    setSaleItems([{ product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
+    setNewSaleItems([{ product_id: '', quantity: 1, unit_price: 0, total_price: 0 }]);
     setSelectedCustomer('walk-in');
     setPaymentMethod('cash');
     setTaxRate(0);
     setDiscountAmount(0);
+    setEditingSale(null);
+  };
+
+  const handleEditSale = (sale: Sale) => {
+    setEditingSale(sale);
+    setSelectedCustomer(sale.customer_id || 'walk-in');
+    setPaymentMethod(sale.payment_method);
+    setTaxRate((sale.tax_amount / sale.subtotal) * 100);
+    setDiscountAmount(sale.discount_amount);
+    setDialogOpen(true);
+  };
+
+  const handleDeleteSale = async (saleId: string) => {
+    if (!confirm('Are you sure you want to delete this sale?')) return;
+
+    try {
+      await supabase.from('sales').delete().eq('id', saleId);
+      toast({ title: "Sale deleted successfully" });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Error deleting sale",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewDetails = async (sale: Sale) => {
+    try {
+      const { data: items, error } = await supabase
+        .from('sale_items')
+        .select(`
+          *,
+          products(name, price)
+        `)
+        .eq('sale_id', sale.id);
+
+      if (error) throw error;
+      setSaleItems(items || []);
+      setViewDetailsSale(sale);
+      setDetailsDialogOpen(true);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching sale details",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportSalesData = () => {
+    const csvData = sales.map(sale => ({
+      'Invoice Number': sale.invoice_number,
+      'Customer': sale.customers?.name || 'Walk-in Customer',
+      'Date': new Date(sale.sale_date).toLocaleDateString(),
+      'Subtotal': sale.subtotal,
+      'Tax': sale.tax_amount,
+      'Discount': sale.discount_amount,
+      'Total': sale.total_amount,
+      'Payment Method': sale.payment_method,
+      'Status': sale.status
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sales-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const { subtotal, taxAmount, total } = calculateTotals();
@@ -239,19 +337,24 @@ const Sales = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Sales</h1>
-          <p className="text-muted-foreground">Manage sales and invoices</p>
+          <h1 className="text-3xl font-bold">Sales & Invoices</h1>
+          <p className="text-muted-foreground">Manage sales transactions and invoices</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Sale
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportSalesData} disabled={sales.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Sales
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Sale
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create New Sale</DialogTitle>
+              <DialogTitle>{editingSale ? 'Edit Sale' : 'Create New Sale'}</DialogTitle>
               <DialogDescription>Add products and customer details</DialogDescription>
             </DialogHeader>
             
@@ -283,7 +386,7 @@ const Sales = () => {
                   </Button>
                 </div>
                 
-                {saleItems.map((item, index) => (
+                {newSaleItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-5">
                       <Select 
@@ -296,7 +399,7 @@ const Sales = () => {
                         <SelectContent>
                           {products.map((product) => (
                             <SelectItem key={product.id} value={product.id}>
-                              {product.name} (Stock: {product.stock_quantity})
+                              {product.name} {product.is_service ? '(Service)' : `(Stock: ${product.stock_quantity})`}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -327,7 +430,7 @@ const Sales = () => {
                       />
                     </div>
                     <div className="col-span-1">
-                      {saleItems.length > 1 && (
+                      {newSaleItems.length > 1 && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -401,37 +504,135 @@ const Sales = () => {
               </div>
 
               <Button onClick={handleCreateSale} className="w-full">
-                Create Sale
+                {editingSale ? 'Update Sale' : 'Create Sale'}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
-      {/* Sales List */}
-      <div className="grid grid-cols-1 gap-4">
-        {sales.map((sale) => (
-          <Card key={sale.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Receipt className="h-5 w-5" />
-                    <span>{sale.invoice_number}</span>
-                  </CardTitle>
-                  <CardDescription>
-                    {sale.customers?.name || 'Walk-in Customer'} • {new Date(sale.sale_date).toLocaleDateString()}
-                  </CardDescription>
+      {/* Sales Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Sales Records</CardTitle>
+          <CardDescription>All sales transactions and invoices</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice #</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sales.map((sale) => (
+                <TableRow key={sale.id}>
+                  <TableCell className="font-medium">{sale.invoice_number}</TableCell>
+                  <TableCell>{sale.customers?.name || 'Walk-in Customer'}</TableCell>
+                  <TableCell>{new Date(sale.sale_date).toLocaleDateString()}</TableCell>
+                  <TableCell>${sale.total_amount.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {sale.payment_method}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={sale.status === 'completed' ? 'default' : 'secondary'}>
+                      {sale.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewDetails(sale)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditSale(sale)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSale(sale.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Sale Details Dialog */}
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Sale Details</DialogTitle>
+            <DialogDescription>
+              {viewDetailsSale?.invoice_number} - {viewDetailsSale?.customers?.name || 'Walk-in Customer'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Unit Price</TableHead>
+                  <TableHead>Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {saleItems.map((item: any, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{item.products?.name}</TableCell>
+                    <TableCell>{item.quantity}</TableCell>
+                    <TableCell>${item.unit_price.toFixed(2)}</TableCell>
+                    <TableCell>${item.total_price.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {viewDetailsSale && (
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>${viewDetailsSale.subtotal.toFixed(2)}</span>
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold">${sale.total_amount.toFixed(2)}</div>
-                  <div className="text-sm text-muted-foreground capitalize">{sale.payment_method}</div>
+                <div className="flex justify-between">
+                  <span>Tax:</span>
+                  <span>${viewDetailsSale.tax_amount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Discount:</span>
+                  <span>-${viewDetailsSale.discount_amount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg border-t pt-2">
+                  <span>Total:</span>
+                  <span>${viewDetailsSale.total_amount.toFixed(2)}</span>
                 </div>
               </div>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {sales.length === 0 && (
         <Card>

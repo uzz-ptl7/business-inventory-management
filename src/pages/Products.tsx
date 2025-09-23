@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, X, Download } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -21,6 +23,8 @@ interface Product {
   stock_quantity: number;
   low_stock_threshold: number;
   category: string;
+  is_service: boolean;
+  product_type: string;
 }
 
 const Products = () => {
@@ -61,6 +65,7 @@ const Products = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const isService = formData.get('product_type') === 'service';
     
     const productData = {
       name: formData.get('name') as string,
@@ -69,9 +74,11 @@ const Products = () => {
       description: formData.get('description') as string,
       price: parseFloat(formData.get('price') as string),
       cost: parseFloat(formData.get('cost') as string),
-      stock_quantity: parseInt(formData.get('stock_quantity') as string),
-      low_stock_threshold: parseInt(formData.get('low_stock_threshold') as string),
+      stock_quantity: isService ? 0 : parseInt(formData.get('stock_quantity') as string),
+      low_stock_threshold: isService ? 0 : parseInt(formData.get('low_stock_threshold') as string),
       category: formData.get('category') as string,
+      product_type: formData.get('product_type') as string || 'product',
+      is_service: isService,
       user_id: user!.id,
     };
 
@@ -131,6 +138,34 @@ const Products = () => {
     setDialogOpen(true);
   };
 
+  const exportProductsData = () => {
+    const csvData = products.map(product => ({
+      'Product Name': product.name,
+      'Type': product.is_service ? 'Service' : 'Product',
+      'Category': product.category,
+      'SKU': product.sku || '',
+      'Barcode': product.barcode || '',
+      'Price': product.price,
+      'Cost': product.cost,
+      'Stock Quantity': product.is_service ? 'N/A' : product.stock_quantity,
+      'Low Stock Alert': product.is_service ? 'N/A' : product.low_stock_threshold,
+      'Description': product.description || ''
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return <div>Loading products...</div>;
   }
@@ -139,33 +174,50 @@ const Products = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-muted-foreground">Manage your inventory</p>
+          <h1 className="text-3xl font-bold">Products & Services</h1>
+          <p className="text-muted-foreground">Manage your inventory and services</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => openDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportProductsData} disabled={products.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Products
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => openDialog()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product/Service
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+              <DialogTitle>{editingProduct ? 'Edit Product/Service' : 'Add New Product/Service'}</DialogTitle>
               <DialogDescription>
-                {editingProduct ? 'Update product information' : 'Enter product details to add to inventory'}
+                {editingProduct ? 'Update product or service information' : 'Enter details to add to inventory'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Product Name</Label>
+                  <Label htmlFor="name">Name</Label>
                   <Input
                     id="name"
                     name="name"
                     defaultValue={editingProduct?.name}
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product_type">Type</Label>
+                  <Select name="product_type" defaultValue={editingProduct?.product_type || 'product'}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="product">Physical Product</SelectItem>
+                      <SelectItem value="service">Service</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
@@ -220,7 +272,7 @@ const Products = () => {
                     name="stock_quantity"
                     type="number"
                     defaultValue={editingProduct?.stock_quantity}
-                    required
+                    placeholder="Not applicable for services"
                   />
                 </div>
                 <div className="space-y-2">
@@ -230,7 +282,7 @@ const Products = () => {
                     name="low_stock_threshold"
                     type="number"
                     defaultValue={editingProduct?.low_stock_threshold || 5}
-                    required
+                    placeholder="Not applicable for services"
                   />
                 </div>
               </div>
@@ -243,11 +295,12 @@ const Products = () => {
                 />
               </div>
               <Button type="submit" className="w-full">
-                {editingProduct ? 'Update Product' : 'Add Product'}
+                {editingProduct ? 'Update Product/Service' : 'Add Product/Service'}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -256,7 +309,12 @@ const Products = () => {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-lg">{product.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{product.name}</CardTitle>
+                    <Badge variant={product.is_service ? "secondary" : "default"}>
+                      {product.is_service ? 'Service' : 'Product'}
+                    </Badge>
+                  </div>
                   <CardDescription>{product.category}</CardDescription>
                 </div>
                 <div className="flex space-x-2">
@@ -282,12 +340,12 @@ const Products = () => {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Stock:</span>
                   <span className={`font-medium ${
-                    product.stock_quantity <= product.low_stock_threshold 
+                    !product.is_service && product.stock_quantity <= product.low_stock_threshold 
                       ? 'text-destructive' 
                       : 'text-foreground'
                   }`}>
-                    {product.stock_quantity}
-                    {product.stock_quantity <= product.low_stock_threshold && (
+                    {product.is_service ? 'Unlimited' : product.stock_quantity}
+                    {!product.is_service && product.stock_quantity <= product.low_stock_threshold && (
                       <AlertTriangle className="inline h-3 w-3 ml-1" />
                     )}
                   </span>
@@ -308,11 +366,11 @@ const Products = () => {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-muted-foreground text-center">
-              No products found. Add your first product to get started.
+              No products or services found. Add your first product or service to get started.
             </p>
             <Button className="mt-4" onClick={() => openDialog()}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Your First Product
+              Add Your First Product/Service
             </Button>
           </CardContent>
         </Card>

@@ -17,6 +17,7 @@ import {
   Package, 
   Users, 
   ShoppingCart, 
+  Truck,
   BarChart3, 
   Settings, 
   LogOut,
@@ -33,6 +34,7 @@ const Layout = () => {
     { icon: Package, label: 'Products', path: '/dashboard/products' },
     { icon: Users, label: 'Customers', path: '/dashboard/customers' },
     { icon: ShoppingCart, label: 'Sales', path: '/dashboard/sales' },
+    { icon: Truck, label: 'Restock', path: '/dashboard/restock' },
     { icon: BarChart3, label: 'Reports', path: '/dashboard/reports' },
     { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
   ];
